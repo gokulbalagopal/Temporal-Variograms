@@ -1,34 +1,37 @@
-include("D:\\UTD\\UTDFall2023\\Temporal_Variograms\\firmware\\Empirical_Variogram_PM.jl")
+#include("D:\\UTD\\UTDFall2023\\Temporal_Variograms\\firmware\\Empirical_Variogram_PM.jl")
 using LsqFit
 using Plots
 # Important links 
 
-# For Theroretical Variogram equations:#https://ml-gis-service.com/index.php/2022/04/01/geostatistics-theoretical-variogram-models/
+# For Theroretical Variogram equations:# https://ml-gis-service.com/index.php/2022/04/01/geostatistics-theoretical-variogram-models/
 # For Theroretical Variogram parameter limits:#https://help.seequent.com/Geothermal/5.0/en-GB/Content/estimation/variograms.htm
 # For fitting Variogram : 
 #γ = emp_var_dict["pm2.5"][1]
 # dict_param = OrderedDict()
 
 # function linear_variogram(h,p)
-#     #p[1] => a => range
-#     #p[2] => C0 => sill
-#     #p[3] => nugget
+#   #p[1] => a =>  range
+#   #p[2] => C =>  sill
+#   #p[3] => C0 => nugget
 
-#     #Equation γ(h) = C0 + (h/a)
+#     #Equation γ(h) = C0 + C*(h/a)
 #     return p[3] .+ p[2]*(h./p[1])
 
 # end
-function exponential_variogram(h,p)
-    #p[1] => a => range
-    #p[2] => C0 => sill
-    #p[3] => nugget
 
-    #Equation γ(h) = C0(1-exp(-h/a)))
+function exponential_variogram(h,p)
+    #p[1] => a =>  range
+    #p[2] => C =>  sill
+    #p[3] => C0 => nugget
+
+
+    #Equation γ(h) = C0 + C*(1-exp(-h/a)))
     return p[3] .+ p[2]*(1 .- exp.(-1*(h./p[1])))
 end
 
 param_dict=OrderedDict()
-function main(γ,key)
+
+function main(γ)
     h = collect(1:1:300)./60 
     # γ = emp_var_dict["pm2.5"][1]
     p0 = [0.10*maximum(h),0.7*maximum(γ),0.05*minimum(γ)] #Initial guess
@@ -38,10 +41,10 @@ function main(γ,key)
     ydata = γ
     #nlin_fit(linear_variogram,xdata,ydata,p0)
     #push!(param_vec,nlin_fit(exponential_variogram,xdata,ydata,p0,key))
-    return nlin_fit(exponential_variogram,xdata,ydata,p0,lb,ub,key)
+    return nlin_fit(exponential_variogram,xdata,ydata,p0,lb,ub)
 end
 
-function nlin_fit(model,xdata,ydata,p0,lb,ub,key)
+function nlin_fit(model,xdata,ydata,p0,lb,ub)
     nlinfit = curve_fit(model,xdata,ydata,p0,lower=lb, upper=ub)
     pfit = nlinfit.param
 
@@ -58,12 +61,30 @@ end
 # for  i in 8:1:14
 #     dict_param[dict_ips7100[i]]  = main(emp_var_dict[dict_ips7100[i]][1],dict_ips7100[i])
 # end
-for key in keys(emp_var_dict)
-    println(key)
-    param_dict[key] = []
-    for i in 1:1:length(emp_var_dict[key])
-        println(i)
-        push!(param_dict[key] , main(emp_var_dict[key][i],key))
+pm_paths = readdir("/media/teamlarylive/loraMints1/empirical_variogram_files/",join=true)
+dict_pm_id_path = OrderedDict("/media/teamlarylive/loraMints1/empirical_variogram_files/pm0.1"  => "pm0.1",
+                   "/media/teamlarylive/loraMints1/empirical_variogram_files/pm0.3"  => "pm0.3",
+                   "/media/teamlarylive/loraMints1/empirical_variogram_files/pm0.5"  => "pm0.5",
+                   "/media/teamlarylive/loraMints1/empirical_variogram_files/pm1.0"  => "pm1.0",
+                   "/media/teamlarylive/loraMints1/empirical_variogram_files/pm2.5"  => "pm2.5",
+                   "/media/teamlarylive/loraMints1/empirical_variogram_files/pm5.0"  => "pm5.0",
+                   "/media/teamlarylive/loraMints1/empirical_variogram_files/pm10.0" => "pm10.0")
+
+param_dict =OrderedDict()
+
+for p in pm_paths
+    pm_id = dict_pm_id_path[p]
+    pm_csv_files = glob("*.csv", p)
+
+    for csv_path in pm_csv_files 
+        df_emp_pm = CSV.read(csv_path,DataFrame)
+        param_dict[pm_id] = []
+        for i in 1:1:nrow(df_emp_pm)
+            println(i)
+            push!(param_dict[pm_id], main(Vector{Any}(df_emp_pm[i,:])))
+        end
+        df = DataFrame(Matrix(hcat(param_dict[pm_id]...)'),:auto)
+        CSV.write("/media/teamlarylive/loraMints1/Paramters/"*pm_id*"/"*csv_path[end-13:end-4]*".csv",df)
     end
 end
 

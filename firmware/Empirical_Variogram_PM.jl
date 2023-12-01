@@ -1,5 +1,10 @@
-include("D:\\UTD\\UTDFall2023\\Temporal_Variograms\\firmware\\Processing_Data.jl")
-using OrderedCollections
+#include("/home/teamlarylive/Desktop/Temporal-Variograms/firmware/tz_shifted_file_generation.jl")
+
+
+
+using CSV,DataFrames,Dates,Impute, Statistics,Glob,OrderedCollections,BenchmarkTools
+
+
 function non_overlapping_rolling_variogram(df,col) 
     df_mat = df[:,2:end]
     mat = Matrix(df_mat[1:nrow(df),:])[:,col]
@@ -34,8 +39,16 @@ dict_ips7100 = OrderedDict(1=>"pc0.1",2=>"pc0.3",3=>"pc0.5",4=>"pc1.0",5=>"pc2.5
                8=>"pm0.1",9=>"pm0.3",10=>"pm0.5",11=>"pm1.0",12=>"pm2.5",13=>"pm5.0",14=>"pm10.0")
 
 emp_var_dict = OrderedDict()
-for i in 8:1:14
-    println("##################################  ",i,"  #######################################")
-    emp_var_dict[dict_ips7100[i]] = non_overlapping_rolling_variogram(df_pm_filtered,i)
+
+
+pm_files = glob("*.csv", "/home/teamlarylive/Desktop/data/processed_data/pm_cleaned_and_cst_tz/")
+for j in 1:1:length(pm_files)
+    df_pm = CSV.read(pm_files[j],DataFrame)
+    for i in 8:1:14
+        println("##################################  ",i,"  #######################################")
+        emp_var_dict[dict_ips7100[i]] = non_overlapping_rolling_variogram(df_pm,i)
+        df = DataFrame(Matrix(hcat(emp_var_dict[dict_ips7100[i]]...)'),:auto)
+        CSV.write("/media/teamlarylive/loraMints1/empirical_variogram_files/"*dict_ips7100[i]*"/"*
+        pm_files[j][end-13:end-4]*".csv",df)
+    end
 end
-    
